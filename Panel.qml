@@ -18,6 +18,9 @@ Panel {
   property bool cursorActive: false
   property bool adding: false
   property string addError: ""
+  property bool draggingSite: false
+  property int dragSourceIndex: -1
+  property int dragInsertBefore: -1
 
   readonly property color foreground: bar ? bar.foreground : Color.foreground
   readonly property color urgent: bar ? bar.urgent : Color.urgent
@@ -161,6 +164,83 @@ Panel {
       scrollItemIntoView(siteColumn.children[siteIndex])
   }
 
+  function siteRowItems() {
+    var rows = []
+    if (!siteColumn) return rows
+    for (var i = 0; i < siteColumn.children.length; i++) {
+      var child = siteColumn.children[i]
+      if (child && child.site !== undefined) rows.push(child)
+    }
+    return rows
+  }
+
+  function siteInsertBeforeAtY(y) {
+    var rows = siteRowItems()
+    if (rows.length === 0) return 0
+    for (var i = 0; i < rows.length; i++) {
+      if (y < rows[i].y + rows[i].height / 2) return i
+    }
+    return rows.length
+  }
+
+  readonly property real dropMarkerThickness: Math.max(2, Style.spacing.xs)
+  readonly property real dropMarkerY: {
+    draggingSite
+    dragInsertBefore
+    var rows = siteRowItems()
+    if (rows.length === 0 || dragInsertBefore < 0) return 0
+    var half = dropMarkerThickness / 2
+    if (dragInsertBefore <= 0) return rows[0].y - half
+    if (dragInsertBefore >= rows.length) {
+      var last = rows[rows.length - 1]
+      return last.y + last.height - half
+    }
+    return rows[dragInsertBefore].y - siteColumn.spacing / 2 - half
+  }
+
+  function beginSiteDrag(index) {
+    draggingSite = true
+    dragSourceIndex = index
+    dragInsertBefore = index
+    cursorActive = true
+    focusSection = "sites"
+    siteIndex = index
+  }
+
+  function updateSiteDrag(yInColumn) {
+    dragInsertBefore = siteInsertBeforeAtY(yInColumn)
+    if (panelFlick && siteColumn) {
+      var y = yInColumn + siteColumn.mapToItem(panelFlick.contentItem, 0, 0).y
+      var viewTop = panelFlick.contentY
+      var viewBottom = viewTop + panelFlick.height
+      var margin = Style.space(24)
+      var maxY = Math.max(0, panelFlick.contentHeight - panelFlick.height)
+      if (y < viewTop + margin) panelFlick.contentY = Math.max(0, panelFlick.contentY - Style.space(8))
+      else if (y > viewBottom - margin) panelFlick.contentY = Math.min(maxY, panelFlick.contentY + Style.space(8))
+    }
+  }
+
+  function endSiteDrag() {
+    var from = dragSourceIndex
+    var insertBefore = dragInsertBefore
+    draggingSite = false
+    dragSourceIndex = -1
+    dragInsertBefore = -1
+    if (!omaup || typeof omaup.moveTarget !== "function") return
+    if (from < 0 || insertBefore < 0) return
+    if (insertBefore === from || insertBefore === from + 1) return
+    var to = insertBefore > from ? insertBefore - 1 : insertBefore
+    omaup.moveTarget(from, to)
+    siteIndex = to
+    ensureCursor()
+  }
+
+  function cancelSiteDrag() {
+    draggingSite = false
+    dragSourceIndex = -1
+    dragInsertBefore = -1
+  }
+
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
 
@@ -170,12 +250,14 @@ Panel {
     addError = ""
     nameField.text = ""
     urlField.text = ""
+    cancelSiteDrag()
     if (omaup && omaup.reloadTheme) omaup.reloadTheme()
     if (panelFlick) panelFlick.contentY = 0
     Qt.callLater(function() { keyCatcher.forceActiveFocus() })
   } else {
     adding = false
     addError = ""
+    cancelSiteDrag()
   }
   onSiteIndexChanged: scrollCursorIntoView()
 
@@ -237,7 +319,7 @@ Panel {
         clip: true
         boundsBehavior: Flickable.StopAtBounds
         flickableDirection: Flickable.VerticalFlick
-        interactive: contentHeight > height
+        interactive: contentHeight > height && !root.draggingSite
         ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
 
         Column {
@@ -273,10 +355,15 @@ Panel {
               fontFamily: root.fontFamily
             }
 
-            Column {
-              id: siteColumn
+            Item {
               width: parent.width
-              spacing: Style.space(6)
+              implicitHeight: siteColumn.implicitHeight
+              height: siteColumn.implicitHeight
+
+              Column {
+                id: siteColumn
+                width: parent.width
+                spacing: Style.space(6)
 
               Repeater {
                 model: root.sites
@@ -421,11 +508,23 @@ Panel {
                 }
               }
             }
+
+            Rectangle {
+              visible: root.draggingSite && root.dragInsertBefore >= 0
+              x: 0
+              y: root.dropMarkerY
+              z: 20
+              width: parent.width
+              height: root.dropMarkerThickness
+              radius: height / 2
+              color: Color.accent
+            }
           }
         }
       }
     }
   }
+}
 
   component SiteRow: CursorSurface {
     id: siteRow
@@ -438,8 +537,10 @@ Panel {
       return root.dim
     }
 
-    hasCursor: root.sitesHasCursor && root.siteIndex === rowIndex
+    hasCursor: root.sitesHasCursor && root.siteIndex === rowIndex && !root.draggingSite
     foreground: root.foreground
+    opacity: root.draggingSite && root.dragSourceIndex === rowIndex ? 0.45 : 1
+    z: sitePointer.dragging ? 10 : 0
     implicitHeight: siteContent.implicitHeight + Style.spacing.rowPaddingX
     readonly property real nameNaturalWidth: Math.ceil(nameMetrics.advanceWidth)
     readonly property real pairNaturalWidth: nameNaturalWidth + Style.space(8) + statusLabel.implicitWidth
@@ -456,12 +557,55 @@ Panel {
     }
 
     MouseArea {
+      id: sitePointer
+      property bool dragging: false
+      property bool suppressClick: false
+      property real pressedX: 0
+      property real pressedY: 0
+      readonly property real dragThreshold: Style.space(4)
+
       anchors.fill: parent
       hoverEnabled: true
-      cursorShape: Qt.PointingHandCursor
       acceptedButtons: Qt.LeftButton
-      onEntered: root.setSiteCursor(siteRow.rowIndex)
-      onClicked: if (omaup) omaup.openTarget(siteRow.site)
+      preventStealing: dragging
+      cursorShape: dragging ? Qt.ClosedHandCursor : Qt.PointingHandCursor
+      onEntered: if (!root.draggingSite) root.setSiteCursor(siteRow.rowIndex)
+      onPressed: function(mouse) {
+        dragging = false
+        suppressClick = false
+        pressedX = mouse.x
+        pressedY = mouse.y
+        root.setSiteCursor(siteRow.rowIndex)
+      }
+      onPositionChanged: function(mouse) {
+        if (!(mouse.buttons & Qt.LeftButton) || !omaup) return
+        var distance = Math.abs(mouse.x - pressedX) + Math.abs(mouse.y - pressedY)
+        if (!dragging && distance >= dragThreshold) {
+          dragging = true
+          root.beginSiteDrag(siteRow.rowIndex)
+        }
+        if (dragging) {
+          var point = siteRow.mapToItem(siteColumn, mouse.x, mouse.y)
+          root.updateSiteDrag(point.y)
+        }
+      }
+      onReleased: function() {
+        var wasDragging = dragging
+        dragging = false
+        if (wasDragging) {
+          suppressClick = true
+          root.endSiteDrag()
+        }
+      }
+      onCanceled: {
+        dragging = false
+        suppressClick = false
+        root.cancelSiteDrag()
+      }
+      onClicked: {
+        if (suppressClick) return
+        if (omaup) omaup.openTarget(siteRow.site)
+      }
     }
 
     RowLayout {

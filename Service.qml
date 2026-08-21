@@ -194,6 +194,21 @@ Item {
     persist()
   }
 
+  function moveTarget(fromIndex, toIndex) {
+    if (!Array.isArray(items)) return
+    var from = parseInt(fromIndex, 10)
+    var to = parseInt(toIndex, 10)
+    if (!isFinite(from) || !isFinite(to)) return
+    if (from === to) return
+    if (from < 0 || from >= items.length || to < 0 || to >= items.length) return
+    var next = items.slice()
+    var item = next.splice(from, 1)[0]
+    if (!item) return
+    next.splice(to, 0, item)
+    setItems(next)
+    persist()
+  }
+
   function enqueue(ids) {
     var queued = pendingIds.slice()
     for (var i = 0; i < ids.length; i++) {
