@@ -230,3 +230,20 @@ function heroMeta(items) {
   if (countBy(items, "status", "up") > 0) return "All systems good"
   return "Waiting for checks"
 }
+
+function nmConnectivity(raw) {
+  var key = String(raw || "").trim().toLowerCase()
+  if (key === "none" || key === "full" || key === "limited" || key === "portal" || key === "unknown") return key
+  return ""
+}
+
+function isOfflineNmState(key) {
+  return key === "none" || key === "limited" || key === "portal"
+}
+
+function isLocalConnectivityFailure(codeText, exitCode) {
+  var code = parseInt(String(codeText || "").trim(), 10)
+  if (isFinite(code) && code > 0) return false
+  var exit = Number(exitCode)
+  return exit === 6 || exit === 7
+}

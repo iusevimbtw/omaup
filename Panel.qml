@@ -429,7 +429,8 @@ Panel {
           PanelHero {
             width: parent.width
             title: "Omaup"
-            meta: omaup ? omaup.heroMeta : "Waiting for checks"
+            detail: omaup && omaup.offline ? "No internet" : ""
+            meta: omaup && omaup.offline ? "" : (omaup ? omaup.heroMeta : "Waiting for checks")
             foreground: root.foreground
             fontFamily: root.fontFamily
             iconComponent: Component {
