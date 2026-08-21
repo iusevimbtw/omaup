@@ -8,6 +8,9 @@ volume icons, so it matches default navbar stroke weight. It uses the active the
 green when every watched URL is up, and the theme’s red when something is
 down. Click the icon for a list of sites; add and remove them in that panel.
 
+Checks run in a single Omarchy shell service, so a multi-monitor bar does not
+poll the same URLs once per screen.
+
 ## Install
 
 From a clone of this repo:
@@ -15,7 +18,7 @@ From a clone of this repo:
 ```bash
 ln -sfn "$(pwd)" ~/.config/omarchy/plugins/iusevimbtw.omaup
 omarchy-shell shell rescanPlugins
-omarchy plugin enable iusevimbtw.omaup --yes
+omarchy plugin enable iusevimbtw.omaup
 ```
 
 Or, once this repo is on GitHub:

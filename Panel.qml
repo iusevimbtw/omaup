@@ -23,13 +23,16 @@ Panel {
   readonly property color urgent: bar ? bar.urgent : Color.urgent
   readonly property color dim: Qt.darker(foreground, 1.55)
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
-  readonly property var sites: omaup.items
+  readonly property var omaup: bar && bar.shell ? bar.shell.serviceFor(moduleName) : null
+  readonly property var sites: omaup && omaup.items ? omaup.items : []
   readonly property color barIconColor: {
+    if (!omaup) return barForeground
     if (omaup.downCount > 0) return urgent
     if (omaup.upCount > 0) return omaup.themeGreen
     return barForeground
   }
   readonly property color heroIconColor: {
+    if (!omaup) return foreground
     if (omaup.downCount > 0) return urgent
     if (omaup.upCount > 0) return omaup.themeGreen
     return foreground
@@ -79,12 +82,12 @@ Panel {
   }
 
   function openSelected() {
-    if (!Array.isArray(sites) || sites.length === 0) return
+    if (!omaup || !Array.isArray(sites) || sites.length === 0) return
     omaup.openTarget(sites[Math.max(0, Math.min(siteIndex, sites.length - 1))])
   }
 
   function deleteSelected() {
-    if (focusSection !== "sites" || !Array.isArray(sites) || sites.length === 0) return
+    if (!omaup || focusSection !== "sites" || !Array.isArray(sites) || sites.length === 0) return
     omaup.removeTarget(sites[Math.max(0, Math.min(siteIndex, sites.length - 1))].id)
     ensureCursor()
   }
@@ -120,6 +123,10 @@ Panel {
   }
 
   function submitAdd() {
+    if (!omaup) {
+      addError = "Service not ready"
+      return
+    }
     var error = omaup.addTarget(nameField.text, urlField.text)
     if (error !== "") {
       addError = error
@@ -163,7 +170,7 @@ Panel {
     addError = ""
     nameField.text = ""
     urlField.text = ""
-    omaup.reloadTheme()
+    if (omaup && omaup.reloadTheme) omaup.reloadTheme()
     if (panelFlick) panelFlick.contentY = 0
     Qt.callLater(function() { keyCatcher.forceActiveFocus() })
   } else {
@@ -172,13 +179,6 @@ Panel {
   }
   onSiteIndexChanged: scrollCursorIntoView()
 
-  Service {
-    id: omaup
-    bar: root.bar
-    settings: root.settings
-    moduleName: root.moduleName
-  }
-
   IpcHandler {
     target: root.ipcTarget
     function open(): void { root.open() }
@@ -186,7 +186,7 @@ Panel {
     function show(): void { root.open() }
     function hide(): void { root.close() }
     function toggle(): void { root.toggle() }
-    function refresh(): string { omaup.refresh(); return "ok" }
+    function refresh(): string { if (root.omaup) root.omaup.refresh(); return "ok" }
   }
 
   BarIconButton {
@@ -195,9 +195,9 @@ Panel {
     bar: root.bar
     text: ""
     foreground: root.barIconColor
-    tooltipText: omaup.heroMeta
+    tooltipText: omaup ? omaup.heroMeta : "Omaup"
     onPressed: function(buttonCode) {
-      if (buttonCode === Qt.RightButton) omaup.refresh()
+      if (buttonCode === Qt.RightButton) { if (omaup) omaup.refresh() }
       else root.toggle()
     }
   }
@@ -225,7 +225,7 @@ Panel {
       onDeleteRequested: root.deleteSelected()
       onTabRequested: function(direction) { root.switchPanel(direction) }
       onTextKey: function(t) {
-        if (t === "r" || t === "R") omaup.refresh()
+        if (t === "r" || t === "R") { if (omaup) omaup.refresh() }
         else if (t === "a" || t === "A") root.startAdding()
       }
 
@@ -248,7 +248,7 @@ Panel {
           PanelHero {
             width: parent.width
             title: "Omaup"
-            meta: omaup.heroMeta
+            meta: omaup ? omaup.heroMeta : "Waiting for checks"
             foreground: root.foreground
             fontFamily: root.fontFamily
             iconComponent: Component {
@@ -434,7 +434,7 @@ Panel {
     readonly property color statusColor: {
       if (!site) return root.dim
       if (site.status === "down") return root.urgent
-      if (site.status === "up") return omaup.themeGreen
+      if (site.status === "up") return omaup ? omaup.themeGreen : root.dim
       return root.dim
     }
 
@@ -448,7 +448,7 @@ Panel {
       cursorShape: Qt.PointingHandCursor
       acceptedButtons: Qt.LeftButton
       onEntered: root.setSiteCursor(siteRow.rowIndex)
-      onClicked: omaup.openTarget(siteRow.site)
+      onClicked: if (omaup) omaup.openTarget(siteRow.site)
     }
 
     RowLayout {
@@ -499,7 +499,7 @@ Panel {
         fontFamily: root.fontFamily
         Layout.alignment: Qt.AlignVCenter
         onClicked: {
-          if (siteRow.site) omaup.removeTarget(siteRow.site.id)
+          if (omaup && siteRow.site) omaup.removeTarget(siteRow.site.id)
         }
       }
     }

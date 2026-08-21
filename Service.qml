@@ -7,8 +7,8 @@ import "Model.js" as Model
 Item {
   id: root
 
-  property var bar: null
-  property var settings: ({})
+  property var shell: null
+  property var manifest: null
   property string moduleName: "iusevimbtw.omaup"
 
   property var items: []
@@ -30,7 +30,7 @@ Item {
   }
   readonly property string configPath: configDir + "/config.json"
   readonly property color themeGreen: greenHex !== "" ? greenHex : Color.accent
-  readonly property int refreshIntervalSec: intSetting("refreshIntervalSec", 30, 5, 3600)
+  readonly property int refreshIntervalSec: intervalFromShell(shell ? shell.shellConfig : null, 30, 5, 3600)
   readonly property int targetCount: { itemsRevision; return Array.isArray(items) ? items.length : 0 }
   readonly property int downCount: { itemsRevision; return Model.countBy(items, "status", "down") }
   readonly property int upCount: { itemsRevision; return Model.countBy(items, "status", "up") }
@@ -42,13 +42,35 @@ Item {
     return Color.foreground
   }
 
-  function setting(name, fallback) {
-    var value = settings ? settings[name] : undefined
-    return value === undefined || value === null ? fallback : value
+  function layoutEntry() {
+    var config = shell && shell.shellConfig ? shell.shellConfig : null
+    if (!config || !config.bar || !config.bar.layout) return null
+    var sections = ["left", "center", "right"]
+    for (var s = 0; s < sections.length; s++) {
+      var arr = config.bar.layout[sections[s]]
+      if (!Array.isArray(arr)) continue
+      for (var i = 0; i < arr.length; i++) {
+        if (arr[i] && String(arr[i].id || "") === moduleName) return arr[i]
+      }
+    }
+    return null
   }
 
-  function intSetting(name, fallback, min, max) {
-    var n = parseInt(String(setting(name, fallback)), 10)
+  function intervalFromShell(config, fallback, min, max) {
+    var raw = fallback
+    if (config && config.bar && config.bar.layout) {
+      var sections = ["left", "center", "right"]
+      for (var s = 0; s < sections.length; s++) {
+        var arr = config.bar.layout[sections[s]]
+        if (!Array.isArray(arr)) continue
+        for (var i = 0; i < arr.length; i++) {
+          if (arr[i] && String(arr[i].id || "") === moduleName && arr[i].refreshIntervalSec !== undefined) {
+            raw = arr[i].refreshIntervalSec
+          }
+        }
+      }
+    }
+    var n = parseInt(String(raw), 10)
     if (!isFinite(n)) n = fallback
     if (n < min) n = min
     if (n > max) n = max
@@ -114,7 +136,8 @@ Item {
 
   function migrateLegacyTargets() {
     if (!configFileReady || items.length > 0) return
-    var legacy = Model.parseTargets(settings ? settings.targets : [])
+    var entry = layoutEntry()
+    var legacy = Model.parseTargets(entry ? entry.targets : [])
     if (legacy.length === 0) return
     applyTargets(legacy)
     persist()
@@ -122,11 +145,12 @@ Item {
   }
 
   function clearLegacyTargets() {
-    if (!settings || !Array.isArray(settings.targets) || settings.targets.length === 0) return
-    if (!bar || !bar.shell || typeof bar.shell.updateEntryInline !== "function") return
-    var entry = { id: moduleName }
-    for (var key in settings) if (key !== "id" && key !== "targets") entry[key] = settings[key]
-    bar.shell.updateEntryInline(moduleName, entry)
+    var entry = layoutEntry()
+    if (!entry || !Array.isArray(entry.targets) || entry.targets.length === 0) return
+    if (!shell || typeof shell.updateEntryInline !== "function") return
+    var next = { id: moduleName }
+    for (var key in entry) if (key !== "id" && key !== "targets") next[key] = entry[key]
+    shell.updateEntryInline(moduleName, next)
   }
 
   function persist() {
@@ -236,7 +260,7 @@ Item {
     colorsFile.reload()
   }
 
-  onSettingsChanged: migrateLegacyTargets()
+  onShellChanged: migrateLegacyTargets()
   Component.onCompleted: {
     ensureDirProc.command = ["mkdir", "-p", root.configDir]
     ensureDirProc.running = true

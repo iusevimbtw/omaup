@@ -1,19 +1,22 @@
 {
   "schemaVersion": 1,
   "id": "iusevimbtw.omaup",
-  "name": "omaup",
+  "name": "Omaup",
   "version": "1.0.0",
   "author": "iusevimbtw",
   "license": "MIT",
   "description": "HTTP uptime watcher for the Omarchy bar. Theme green when every site is up, theme red when something is down.",
   "kinds": [
+    "service",
     "bar-widget"
   ],
+  "keepLoaded": true,
   "entryPoints": {
+    "service": "Service.qml",
     "barWidget": "Panel.qml"
   },
   "barWidget": {
-    "displayName": "omaup",
+    "displayName": "Omaup",
     "description": "Watch HTTP URLs from the bar. Click for status, add and remove sites in the dropdown.",
     "category": "Network",
     "allowMultiple": false,
