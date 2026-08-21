@@ -132,17 +132,26 @@ function caption(item) {
   return "Waiting…"
 }
 
-function displaySites(items) {
+function downSites(items) {
   var down = []
+  if (!Array.isArray(items)) return down
+  for (var i = 0; i < items.length; i++) {
+    if (items[i] && items[i].status === "down") down.push(items[i])
+  }
+  return down
+}
+
+function onlineSites(items) {
   var rest = []
   if (!Array.isArray(items)) return rest
   for (var i = 0; i < items.length; i++) {
-    var item = items[i]
-    if (!item) continue
-    if (item.status === "down") down.push(item)
-    else rest.push(item)
+    if (items[i] && items[i].status !== "down") rest.push(items[i])
   }
-  return down.concat(rest)
+  return rest
+}
+
+function displaySites(items) {
+  return downSites(items).concat(onlineSites(items))
 }
 
 function countBy(items, key, value) {

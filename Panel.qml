@@ -29,10 +29,20 @@ Panel {
   readonly property color dim: Qt.darker(foreground, 1.55)
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
   readonly property var omaup: bar && bar.shell ? bar.shell.serviceFor(moduleName) : null
-  readonly property var sites: {
+  readonly property var downSites: {
     if (!omaup) return []
     omaup.itemsRevision
-    return Model.displaySites(omaup.items)
+    return Model.downSites(omaup.items)
+  }
+  readonly property var onlineSites: {
+    if (!omaup) return []
+    omaup.itemsRevision
+    return Model.onlineSites(omaup.items)
+  }
+  readonly property var sites: {
+    downSites
+    onlineSites
+    return Model.displaySites(omaup ? omaup.items : [])
   }
   readonly property color barIconColor: {
     if (!omaup) return barForeground
@@ -195,8 +205,9 @@ Panel {
   }
 
   function scrollCursorIntoView() {
-    if (focusSection === "sites" && siteColumn && siteIndex >= 0 && siteIndex < siteColumn.children.length)
-      scrollItemIntoView(siteColumn.children[siteIndex])
+    if (focusSection !== "sites") return
+    var rows = siteRowItems()
+    if (siteIndex >= 0 && siteIndex < rows.length) scrollItemIntoView(rows[siteIndex])
   }
 
   function siteRowItems() {
@@ -392,12 +403,6 @@ Panel {
             width: parent.width
             spacing: Style.space(10)
 
-            PanelSectionHeader {
-              text: "SITES"
-              foreground: root.foreground
-              fontFamily: root.fontFamily
-            }
-
             Item {
               width: parent.width
               implicitHeight: siteColumn.implicitHeight
@@ -408,16 +413,38 @@ Panel {
                 width: parent.width
                 spacing: Style.space(6)
 
-              Repeater {
-                model: root.sites
-                SiteRow {
-                  required property var modelData
-                  required property int index
-                  width: siteColumn.width
-                  site: modelData
-                  rowIndex: index
+                SectionRule {
+                  visible: root.downSites.length > 0
+                  width: parent.width
+                  text: "OFFLINE"
                 }
-              }
+
+                Repeater {
+                  model: root.downSites
+                  SiteRow {
+                    required property var modelData
+                    required property int index
+                    width: siteColumn.width
+                    site: modelData
+                    rowIndex: index
+                  }
+                }
+
+                SectionRule {
+                  width: parent.width
+                  text: "ONLINE"
+                }
+
+                Repeater {
+                  model: root.onlineSites
+                  SiteRow {
+                    required property var modelData
+                    required property int index
+                    width: siteColumn.width
+                    site: modelData
+                    rowIndex: root.downSites.length + index
+                  }
+                }
 
               CursorSurface {
                 id: addRow
@@ -568,6 +595,34 @@ Panel {
     }
   }
 }
+
+  component SectionRule: Item {
+    id: rule
+    property string text: ""
+    property color foreground: root.foreground
+    width: parent ? parent.width : implicitWidth
+    implicitHeight: Math.max(label.implicitHeight, line.height)
+
+    PanelSectionHeader {
+      id: label
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+      text: rule.text
+      foreground: rule.foreground
+      fontFamily: root.fontFamily
+    }
+
+    Rectangle {
+      id: line
+      anchors.left: label.right
+      anchors.leftMargin: Style.space(8)
+      anchors.right: parent.right
+      anchors.verticalCenter: label.verticalCenter
+      anchors.verticalCenterOffset: Math.round(label.topPadding / 2)
+      height: 1
+      color: Qt.rgba(rule.foreground.r, rule.foreground.g, rule.foreground.b, 0.12)
+    }
+  }
 
   component SiteRow: CursorSurface {
     id: siteRow
