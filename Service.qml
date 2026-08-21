@@ -19,8 +19,8 @@ Item {
   property int checkGeneration: 0
   property int activeGeneration: 0
   property bool hydrating: false
-  property bool configFileReady: false
   property bool persistAfterMkdir: false
+  property bool writingConfig: false
 
   readonly property string configDir: {
     var xdg = String(Quickshell.env("XDG_CONFIG_HOME") || "")
@@ -40,20 +40,6 @@ Item {
     if (downCount > 0) return Color.urgent
     if (upCount > 0) return themeGreen
     return Color.foreground
-  }
-
-  function layoutEntry() {
-    var config = shell && shell.shellConfig ? shell.shellConfig : null
-    if (!config || !config.bar || !config.bar.layout) return null
-    var sections = ["left", "center", "right"]
-    for (var s = 0; s < sections.length; s++) {
-      var arr = config.bar.layout[sections[s]]
-      if (!Array.isArray(arr)) continue
-      for (var i = 0; i < arr.length; i++) {
-        if (arr[i] && String(arr[i].id || "") === moduleName) return arr[i]
-      }
-    }
-    return null
   }
 
   function intervalFromShell(config, fallback, min, max) {
@@ -129,28 +115,14 @@ Item {
   }
 
   function loadConfig(raw) {
-    applyTargets(Model.parseConfig(raw).targets)
-    configFileReady = true
-    migrateLegacyTargets()
-  }
-
-  function migrateLegacyTargets() {
-    if (!configFileReady || items.length > 0) return
-    var entry = layoutEntry()
-    var legacy = Model.parseTargets(entry ? entry.targets : [])
-    if (legacy.length === 0) return
-    applyTargets(legacy)
-    persist()
-    clearLegacyTargets()
-  }
-
-  function clearLegacyTargets() {
-    var entry = layoutEntry()
-    if (!entry || !Array.isArray(entry.targets) || entry.targets.length === 0) return
-    if (!shell || typeof shell.updateEntryInline !== "function") return
-    var next = { id: moduleName }
-    for (var key in entry) if (key !== "id" && key !== "targets") next[key] = entry[key]
-    shell.updateEntryInline(moduleName, next)
+    if (writingConfig) {
+      writingConfig = false
+      return
+    }
+    var text = String(raw || "")
+    var parsed = Model.parseConfig(text)
+    if (parsed.targets.length === 0 && items.length > 0 && text.trim() === "") return
+    applyTargets(parsed.targets)
   }
 
   function persist() {
@@ -162,6 +134,7 @@ Item {
 
   function writeConfig() {
     persistAfterMkdir = false
+    writingConfig = true
     configFile.setText(Model.serializeConfig(items))
   }
 
@@ -308,7 +281,6 @@ Item {
     colorsFile.reload()
   }
 
-  onShellChanged: migrateLegacyTargets()
   Component.onCompleted: {
     ensureDirProc.command = ["mkdir", "-p", root.configDir]
     ensureDirProc.running = true
@@ -329,9 +301,22 @@ Item {
     watchChanges: true
     atomicWrites: true
     printErrors: false
-    onLoaded: root.loadConfig(text())
-    onLoadFailed: root.loadConfig("")
-    onFileChanged: reload()
+    onLoaded: {
+      if (root.writingConfig) {
+        root.writingConfig = false
+        return
+      }
+      root.loadConfig(text())
+    }
+    onLoadFailed: {
+      if (root.writingConfig) {
+        root.writingConfig = false
+        return
+      }
+      if (root.items.length > 0) return
+      root.loadConfig("")
+    }
+    onFileChanged: if (!root.writingConfig) reload()
   }
 
   FileView {
