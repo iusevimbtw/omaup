@@ -19,7 +19,16 @@ Item {
   property int checkGeneration: 0
   property int activeGeneration: 0
   property bool hydrating: false
+  property bool configFileReady: false
+  property bool persistAfterMkdir: false
 
+  readonly property string configDir: {
+    var xdg = String(Quickshell.env("XDG_CONFIG_HOME") || "")
+    var home = String(Quickshell.env("HOME") || "")
+    var base = xdg !== "" ? xdg : (home + "/.config")
+    return base + "/omaup"
+  }
+  readonly property string configPath: configDir + "/config.json"
   readonly property color themeGreen: greenHex !== "" ? greenHex : Color.accent
   readonly property int refreshIntervalSec: intSetting("refreshIntervalSec", 30, 5, 3600)
   readonly property int targetCount: { itemsRevision; return Array.isArray(items) ? items.length : 0 }
@@ -78,8 +87,7 @@ Item {
     setItems(next)
   }
 
-  function syncFromSettings() {
-    var configured = Model.parseTargets(settings ? settings.targets : [])
+  function applyTargets(configured) {
     var previous = {}
     for (var i = 0; i < items.length; i++) {
       if (items[i]) previous[items[i].id] = items[i]
@@ -98,13 +106,39 @@ Item {
     if (newIds.length > 0) enqueue(newIds)
   }
 
-  function persist() {
-    if (hydrating) return
+  function loadConfig(raw) {
+    applyTargets(Model.parseConfig(raw).targets)
+    configFileReady = true
+    migrateLegacyTargets()
+  }
+
+  function migrateLegacyTargets() {
+    if (!configFileReady || items.length > 0) return
+    var legacy = Model.parseTargets(settings ? settings.targets : [])
+    if (legacy.length === 0) return
+    applyTargets(legacy)
+    persist()
+    clearLegacyTargets()
+  }
+
+  function clearLegacyTargets() {
+    if (!settings || !Array.isArray(settings.targets) || settings.targets.length === 0) return
     if (!bar || !bar.shell || typeof bar.shell.updateEntryInline !== "function") return
     var entry = { id: moduleName }
-    for (var key in settings) if (key !== "id") entry[key] = settings[key]
-    entry.targets = Model.persistable(items)
+    for (var key in settings) if (key !== "id" && key !== "targets") entry[key] = settings[key]
     bar.shell.updateEntryInline(moduleName, entry)
+  }
+
+  function persist() {
+    if (hydrating) return
+    persistAfterMkdir = true
+    ensureDirProc.command = ["mkdir", "-p", root.configDir]
+    if (!ensureDirProc.running) ensureDirProc.running = true
+  }
+
+  function writeConfig() {
+    persistAfterMkdir = false
+    configFile.setText(Model.serializeConfig(items))
   }
 
   function addTarget(name, url) {
@@ -202,10 +236,30 @@ Item {
     colorsFile.reload()
   }
 
-  onSettingsChanged: syncFromSettings()
+  onSettingsChanged: migrateLegacyTargets()
   Component.onCompleted: {
-    syncFromSettings()
+    ensureDirProc.command = ["mkdir", "-p", root.configDir]
+    ensureDirProc.running = true
     colorsFile.reload()
+  }
+
+  Process {
+    id: ensureDirProc
+    onExited: {
+      if (root.persistAfterMkdir) root.writeConfig()
+      else configFile.reload()
+    }
+  }
+
+  FileView {
+    id: configFile
+    path: root.configPath
+    watchChanges: true
+    atomicWrites: true
+    printErrors: false
+    onLoaded: root.loadConfig(text())
+    onLoadFailed: root.loadConfig("")
+    onFileChanged: reload()
   }
 
   FileView {

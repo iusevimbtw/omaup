@@ -19,8 +19,7 @@
     "allowMultiple": false,
     "defaultSection": "right",
     "defaults": {
-      "refreshIntervalSec": 30,
-      "targets": []
+      "refreshIntervalSec": 30
     },
     "schema": [
       {

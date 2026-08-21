@@ -3,7 +3,8 @@
 HTTP uptime watcher for the [Omarchy](https://omarchy.org/) bar. Plugin id is
 `iusevimbtw.omaup`.
 
-The bar icon is the web globe glyph. It uses the active theme’s
+The bar icon is the Font Awesome globe, the same glyph family as the
+volume icons, so it matches default navbar stroke weight. It uses the active theme’s
 green when every watched URL is up, and the theme’s red when something is
 down. Click the icon for a list of sites; add and remove them in that panel.
 
@@ -30,7 +31,7 @@ The widget lands in the right section of the bar. Move it with
 
 - Left click: open the status list
 - Right click: refresh now
-- In the panel: **Add** a name and URL, click a row to open it, trash to remove
+- In the panel: click **Add** to enter a name and URL; click a row to open it; trash to remove
 - Keys: `j`/`k` move, Enter opens, `a` focuses add, `x` removes, `r` refreshes, Esc closes
 
 A site is **up** when the final HTTP status after redirects is 2xx. Timeouts,
@@ -38,12 +39,11 @@ DNS failures, and other statuses are **down**. Checks run one at a time via
 `curl`, every 30 seconds by default (`refreshIntervalSec` on the widget entry
 in `~/.config/omarchy/shell.json`).
 
-The watched list is stored on that same widget entry:
+The watched list lives in `~/.config/omaup/config.json`, so it survives plugin
+updates and bar layout resets:
 
 ```json
 {
-  "id": "iusevimbtw.omaup",
-  "refreshIntervalSec": 30,
   "targets": [
     { "id": "t1", "name": "Example", "url": "https://example.com" }
   ]

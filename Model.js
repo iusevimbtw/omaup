@@ -1,3 +1,19 @@
+function parseConfig(raw) {
+  var text = String(raw || "").trim()
+  if (text === "") return { targets: [] }
+  try {
+    var parsed = JSON.parse(text)
+    if (!parsed || typeof parsed !== "object") return { targets: [] }
+    return { targets: parseTargets(parsed.targets) }
+  } catch (e) {
+    return { targets: [] }
+  }
+}
+
+function serializeConfig(items) {
+  return JSON.stringify({ targets: persistable(items) }, null, 2) + "\n"
+}
+
 function parseTargets(raw) {
   if (!Array.isArray(raw)) return []
   var result = []

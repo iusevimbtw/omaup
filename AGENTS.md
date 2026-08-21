@@ -19,7 +19,7 @@ commit metadata you generate. The only public identity is the GitHub handle
 ```text
 manifest.json   Bar-widget plugin (id iusevimbtw.omaup)
 Panel.qml       Bar icon + KeyboardPanel dropdown
-Service.qml     HTTP checks, persist, theme green
+Service.qml     HTTP checks, ~/.config/omaup persist, theme green
 Model.js        URL normalize and status helpers
 ```
 

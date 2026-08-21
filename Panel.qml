@@ -16,6 +16,7 @@ Panel {
   property string focusSection: "add"
   property int siteIndex: 0
   property bool cursorActive: false
+  property bool adding: false
   property string addError: ""
 
   readonly property color foreground: bar ? bar.foreground : Color.foreground
@@ -35,7 +36,7 @@ Panel {
   }
   readonly property bool sitesHasCursor: cursorActive && focusSection === "sites"
   readonly property bool addHasCursor: cursorActive && focusSection === "add"
-  readonly property bool editingAdd: nameField.activeFocus || urlField.activeFocus
+  readonly property bool editingAdd: adding && (nameField.activeFocus || urlField.activeFocus)
 
   function ensureCursor() {
     if (!Array.isArray(sites) || sites.length === 0) {
@@ -101,6 +102,8 @@ Panel {
   }
 
   function startAdding() {
+    adding = true
+    addError = ""
     setAddCursor()
     Qt.callLater(function() {
       nameField.forceActiveFocus()
@@ -109,7 +112,10 @@ Panel {
   }
 
   function stopAdding() {
+    adding = false
     addError = ""
+    nameField.text = ""
+    urlField.text = ""
     Qt.callLater(function() { if (keyCatcher) keyCatcher.forceActiveFocus() })
   }
 
@@ -119,9 +125,6 @@ Panel {
       addError = error
       return
     }
-    addError = ""
-    nameField.text = ""
-    urlField.text = ""
     stopAdding()
     if (sites.length > 0) {
       focusSection = "sites"
@@ -156,10 +159,16 @@ Panel {
 
   onOpenedChanged: if (opened) {
     cursorActive = false
+    adding = false
     addError = ""
+    nameField.text = ""
+    urlField.text = ""
     omaup.reloadTheme()
     if (panelFlick) panelFlick.contentY = 0
     Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+  } else {
+    adding = false
+    addError = ""
   }
   onSiteIndexChanged: scrollCursorIntoView()
 
@@ -184,9 +193,8 @@ Panel {
     id: button
     anchors.fill: parent
     bar: root.bar
-    text: "󰖟"
+    text: ""
     foreground: root.barIconColor
-    slotSize: Style.bar.statusSlot
     tooltipText: omaup.heroMeta
     onPressed: function(buttonCode) {
       if (buttonCode === Qt.RightButton) omaup.refresh()
@@ -213,7 +221,7 @@ Panel {
         root.moveCursor(dx, dy)
       }
       onActivateRequested: if (root.cursorActive) root.activateCursor()
-      onCloseRequested: root.close()
+      onCloseRequested: root.adding ? root.stopAdding() : root.close()
       onDeleteRequested: root.deleteSelected()
       onTabRequested: function(direction) { root.switchPanel(direction) }
       onTextKey: function(t) {
@@ -239,13 +247,13 @@ Panel {
 
           PanelHero {
             width: parent.width
-            title: "Uptime"
+            title: "Omaup"
             meta: omaup.heroMeta
             foreground: root.foreground
             fontFamily: root.fontFamily
             iconComponent: Component {
               Text {
-                text: "󰖟"
+                text: ""
                 color: root.heroIconColor
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.display
@@ -265,19 +273,8 @@ Panel {
               fontFamily: root.fontFamily
             }
 
-            Text {
-              visible: omaup.targetCount === 0
-              width: parent.width
-              text: "No sites yet"
-              color: root.dim
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.body
-              horizontalAlignment: Text.AlignHCenter
-            }
-
             Column {
               id: siteColumn
-              visible: omaup.targetCount > 0
               width: parent.width
               spacing: Style.space(6)
 
@@ -291,100 +288,135 @@ Panel {
                   rowIndex: index
                 }
               }
-            }
-          }
 
-          PanelSeparator { foreground: root.foreground }
+              CursorSurface {
+                id: addRow
+                visible: !root.adding
+                width: parent.width
+                implicitHeight: addRowContent.implicitHeight + Style.spacing.rowPaddingX
+                hasCursor: root.addHasCursor
+                foreground: root.foreground
 
-          Column {
-            width: parent.width
-            spacing: Style.space(8)
-
-            PanelSectionHeader {
-              text: "ADD SITE"
-              foreground: root.foreground
-              fontFamily: root.fontFamily
-            }
-
-            CursorSurface {
-              id: addSurface
-              width: parent.width
-              implicitHeight: addForm.implicitHeight + Style.spacing.rowPaddingX
-              hasCursor: root.addHasCursor && !root.editingAdd
-              foreground: root.foreground
-
-              MouseArea {
-                anchors.fill: parent
-                hoverEnabled: true
-                onEntered: root.setAddCursor()
-                onClicked: root.startAdding()
-              }
-
-              Column {
-                id: addForm
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                anchors.leftMargin: Style.space(10)
-                anchors.rightMargin: Style.space(10)
-                spacing: Style.space(8)
-
-                TextField {
-                  id: nameField
-                  width: parent.width
-                  placeholderText: "Name"
-                  foreground: root.foreground
-                  font.family: root.fontFamily
-                  onActiveFocusChanged: if (activeFocus) root.setAddCursor()
-                  Keys.onPressed: function(event) {
-                    if (event.key === Qt.Key_Escape) {
-                      root.stopAdding()
-                      event.accepted = true
-                    } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                      urlField.forceActiveFocus()
-                      event.accepted = true
-                    }
-                  }
+                MouseArea {
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onEntered: root.setAddCursor()
+                  onClicked: root.startAdding()
                 }
 
-                TextField {
-                  id: urlField
-                  width: parent.width
-                  placeholderText: "https://example.com"
-                  foreground: root.foreground
-                  font.family: root.fontFamily
-                  onActiveFocusChanged: if (activeFocus) root.setAddCursor()
-                  Keys.onPressed: function(event) {
-                    if (event.key === Qt.Key_Escape) {
-                      root.stopAdding()
-                      event.accepted = true
-                    } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                      root.submitAdd()
-                      event.accepted = true
-                    }
-                  }
-                }
-
-                Row {
-                  width: parent.width
+                RowLayout {
+                  anchors.left: parent.left
+                  anchors.right: parent.right
+                  anchors.verticalCenter: parent.verticalCenter
+                  anchors.leftMargin: Style.space(10)
+                  anchors.rightMargin: Style.space(10)
                   spacing: Style.space(8)
 
-                  Button {
-                    text: "Add"
-                    bordered: true
+                  Rectangle {
+                    width: Style.space(8)
+                    height: Style.space(8)
+                    radius: width / 2
+                    color: root.dim
+                    Layout.alignment: Qt.AlignVCenter
+                  }
+
+                  ColumnLayout {
+                    id: addRowContent
+                    Layout.fillWidth: true
+                    spacing: Style.space(1)
+
+                    Text {
+                      Layout.fillWidth: true
+                      text: "Add"
+                      color: root.foreground
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.body
+                      elide: Text.ElideRight
+                    }
+
+                    Text {
+                      Layout.fillWidth: true
+                      text: "Watch a new URL"
+                      color: root.dim
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.caption
+                      elide: Text.ElideRight
+                    }
+                  }
+
+                  PanelActionButton {
+                    iconText: "󰐕"
+                    tooltipText: "Add site"
                     foreground: root.foreground
                     fontFamily: root.fontFamily
-                    onClicked: root.submitAdd()
-                    onHovered: function(on) { if (on) root.setAddCursor() }
+                    Layout.alignment: Qt.AlignVCenter
+                    onClicked: root.startAdding()
+                  }
+                }
+              }
+
+              CursorSurface {
+                id: addFormSurface
+                visible: root.adding
+                width: parent.width
+                implicitHeight: addForm.implicitHeight + Style.spacing.rowPaddingX
+                hasCursor: root.addHasCursor && !root.editingAdd
+                foreground: root.foreground
+
+                Column {
+                  id: addForm
+                  anchors.left: parent.left
+                  anchors.right: parent.right
+                  anchors.verticalCenter: parent.verticalCenter
+                  anchors.leftMargin: Style.space(10)
+                  anchors.rightMargin: Style.space(10)
+                  spacing: Style.space(8)
+
+                  TextField {
+                    id: nameField
+                    width: parent.width
+                    placeholderText: "Name"
+                    foreground: root.foreground
+                    font.family: root.fontFamily
+                    onActiveFocusChanged: if (activeFocus) root.setAddCursor()
+                    Keys.onPressed: function(event) {
+                      if (event.key === Qt.Key_Escape) {
+                        root.stopAdding()
+                        event.accepted = true
+                      } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                        urlField.forceActiveFocus()
+                        event.accepted = true
+                      }
+                    }
+                  }
+
+                  TextField {
+                    id: urlField
+                    width: parent.width
+                    placeholderText: "https://example.com"
+                    foreground: root.foreground
+                    font.family: root.fontFamily
+                    onActiveFocusChanged: if (activeFocus) root.setAddCursor()
+                    Keys.onPressed: function(event) {
+                      if (event.key === Qt.Key_Escape) {
+                        root.stopAdding()
+                        event.accepted = true
+                      } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                        root.submitAdd()
+                        event.accepted = true
+                      }
+                    }
                   }
 
                   Text {
                     visible: root.addError !== ""
+                    width: parent.width
                     text: root.addError
                     color: root.urgent
                     font.family: root.fontFamily
                     font.pixelSize: Style.font.caption
-                    anchors.verticalCenter: parent.verticalCenter
+                    wrapMode: Text.WordWrap
                   }
                 }
               }
