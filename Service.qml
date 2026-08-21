@@ -114,11 +114,12 @@ Item {
     if (newIds.length > 0) enqueue(newIds)
   }
 
+  function ignoreConfigRead() {
+    return writingConfig || persistAfterMkdir
+  }
+
   function loadConfig(raw) {
-    if (writingConfig) {
-      writingConfig = false
-      return
-    }
+    if (ignoreConfigRead()) return
     var text = String(raw || "")
     var parsed = Model.parseConfig(text)
     if (parsed.targets.length === 0 && items.length > 0 && text.trim() === "") return
@@ -127,6 +128,7 @@ Item {
 
   function persist() {
     if (hydrating) return
+    writingConfig = true
     persistAfterMkdir = true
     ensureDirProc.command = ["mkdir", "-p", root.configDir]
     if (!ensureDirProc.running) ensureDirProc.running = true
@@ -192,25 +194,8 @@ Item {
   }
 
   function moveTarget(id, beforeId) {
-    var from = findIndex(id)
-    if (from < 0) return
-    var before = String(beforeId || "")
-    var currentNext = from + 1 < items.length && items[from + 1] ? String(items[from + 1].id || "") : ""
-    if (before === currentNext) return
-    if (before === "" && from === items.length - 1) return
-    var next = items.slice()
-    var item = next.splice(from, 1)[0]
-    if (!item) return
-    var to = next.length
-    if (before !== "") {
-      for (var i = 0; i < next.length; i++) {
-        if (next[i] && String(next[i].id || "") === before) {
-          to = i
-          break
-        }
-      }
-    }
-    next.splice(to, 0, item)
+    var next = Model.moveInDisplayGroup(items, id, beforeId)
+    if (!next) return
     setItems(next)
     persist()
   }
@@ -302,6 +287,7 @@ Item {
     atomicWrites: true
     printErrors: false
     onLoaded: {
+      if (root.persistAfterMkdir) return
       if (root.writingConfig) {
         root.writingConfig = false
         return
@@ -309,14 +295,11 @@ Item {
       root.loadConfig(text())
     }
     onLoadFailed: {
-      if (root.writingConfig) {
-        root.writingConfig = false
-        return
-      }
+      if (root.ignoreConfigRead()) return
       if (root.items.length > 0) return
       root.loadConfig("")
     }
-    onFileChanged: if (!root.writingConfig) reload()
+    onFileChanged: if (!root.ignoreConfigRead()) reload()
   }
 
   FileView {

@@ -259,6 +259,19 @@ Panel {
     return rows.length
   }
 
+  function dragInsertRange(id) {
+    var downCount = Array.isArray(downSites) ? downSites.length : 0
+    var n = Array.isArray(sites) ? sites.length : 0
+    var from = indexOfSiteId(id)
+    if (from >= 0 && from < downCount) return { lo: 0, hi: downCount }
+    return { lo: downCount, hi: n }
+  }
+
+  function clampDragInsert(insertBefore, id) {
+    var range = dragInsertRange(id)
+    return Math.max(range.lo, Math.min(range.hi, insertBefore))
+  }
+
   readonly property real dropMarkerThickness: Math.max(2, Style.spacing.xs)
   readonly property real dropMarkerY: {
     draggingSite
@@ -287,7 +300,7 @@ Panel {
   }
 
   function updateSiteDrag(yInColumn) {
-    dragInsertBefore = siteInsertBeforeAtY(yInColumn)
+    dragInsertBefore = clampDragInsert(siteInsertBeforeAtY(yInColumn), dragSourceId)
     if (panelFlick && siteColumn) {
       var y = yInColumn + siteColumn.mapToItem(panelFlick.contentItem, 0, 0).y
       var viewTop = panelFlick.contentY
@@ -301,8 +314,8 @@ Panel {
 
   function endSiteDrag() {
     var id = dragSourceId
-    var insertBefore = dragInsertBefore
-    var displayed = sites
+    var insertBefore = clampDragInsert(dragInsertBefore, id)
+    var range = dragInsertRange(id)
     var from = indexOfSiteId(id)
     draggingSite = false
     dragSourceIndex = -1
@@ -311,7 +324,7 @@ Panel {
     if (!omaup || typeof omaup.moveTarget !== "function") return
     if (id === "" || from < 0 || insertBefore < 0) return
     if (insertBefore === from || insertBefore === from + 1) return
-    var beforeId = insertBefore < displayed.length ? siteIdAt(insertBefore) : ""
+    var beforeId = insertBefore < range.hi ? siteIdAt(insertBefore) : ""
     omaup.moveTarget(id, beforeId)
     focusedSiteId = id
     syncCursorToFocusedSite()

@@ -154,6 +154,65 @@ function displaySites(items) {
   return downSites(items).concat(onlineSites(items))
 }
 
+function inStatusGroup(item, down) {
+  if (!item) return false
+  return down ? item.status === "down" : item.status !== "down"
+}
+
+function moveInDisplayGroup(items, id, beforeId) {
+  if (!Array.isArray(items)) return null
+  var needle = String(id || "")
+  if (needle === "") return null
+  var from = -1
+  for (var i = 0; i < items.length; i++) {
+    if (items[i] && String(items[i].id || "") === needle) {
+      from = i
+      break
+    }
+  }
+  if (from < 0) return null
+  var down = items[from].status === "down"
+  var group = []
+  for (var j = 0; j < items.length; j++) {
+    if (inStatusGroup(items[j], down)) group.push(items[j])
+  }
+  var moved = null
+  var rest = []
+  for (var g = 0; g < group.length; g++) {
+    if (String(group[g].id || "") === needle) moved = group[g]
+    else rest.push(group[g])
+  }
+  if (!moved) return null
+  var before = String(beforeId || "")
+  var insertAt = rest.length
+  if (before !== "") {
+    for (var r = 0; r < rest.length; r++) {
+      if (String(rest[r].id || "") === before) {
+        insertAt = r
+        break
+      }
+    }
+  }
+  rest.splice(insertAt, 0, moved)
+  var same = group.length === rest.length
+  if (same) {
+    for (var k = 0; k < group.length; k++) {
+      if (String(group[k].id || "") !== String(rest[k].id || "")) {
+        same = false
+        break
+      }
+    }
+  }
+  if (same) return null
+  var next = []
+  var used = 0
+  for (var n = 0; n < items.length; n++) {
+    if (inStatusGroup(items[n], down)) next.push(rest[used++])
+    else next.push(items[n])
+  }
+  return next
+}
+
 function countBy(items, key, value) {
   var n = 0
   if (!Array.isArray(items)) return 0
