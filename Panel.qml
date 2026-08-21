@@ -619,6 +619,29 @@ Panel {
                     font.pixelSize: Style.font.caption
                     wrapMode: Text.WordWrap
                   }
+
+                  RowLayout {
+                    width: parent.width
+                    spacing: Style.spacing.controlGap
+
+                    Item {
+                      Layout.fillWidth: true
+                    }
+
+                    Button {
+                      text: "Cancel"
+                      foreground: root.foreground
+                      fontFamily: root.fontFamily
+                      onClicked: root.stopAdding()
+                    }
+
+                    Button {
+                      text: root.editingId !== "" ? "Save" : "Add"
+                      foreground: root.foreground
+                      fontFamily: root.fontFamily
+                      onClicked: root.submitAdd()
+                    }
+                  }
                 }
               }
             }
