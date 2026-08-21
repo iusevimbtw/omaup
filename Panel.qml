@@ -495,6 +495,7 @@ Panel {
                 }
 
                 RowLayout {
+                  id: addRowContent
                   anchors.left: parent.left
                   anchors.right: parent.right
                   anchors.verticalCenter: parent.verticalCenter
@@ -510,28 +511,26 @@ Panel {
                     Layout.alignment: Qt.AlignVCenter
                   }
 
-                  ColumnLayout {
-                    id: addRowContent
+                  Text {
+                    text: "Add"
+                    color: root.foreground
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.body
+                    Layout.alignment: Qt.AlignVCenter
+                  }
+
+                  Text {
+                    text: "Watch a new URL"
+                    color: root.dim
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    Layout.alignment: Qt.AlignBaseline
+                  }
+
+                  Item {
                     Layout.fillWidth: true
-                    spacing: Style.space(1)
-
-                    Text {
-                      Layout.fillWidth: true
-                      text: "Add"
-                      color: root.foreground
-                      font.family: root.fontFamily
-                      font.pixelSize: Style.font.body
-                      elide: Text.ElideRight
-                    }
-
-                    Text {
-                      Layout.fillWidth: true
-                      text: "Watch a new URL"
-                      color: root.dim
-                      font.family: root.fontFamily
-                      font.pixelSize: Style.font.caption
-                      elide: Text.ElideRight
-                    }
+                    Layout.preferredWidth: 0
+                    Layout.minimumWidth: 0
                   }
 
                   PanelActionButton {
