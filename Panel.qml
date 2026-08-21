@@ -18,6 +18,7 @@ Panel {
   property bool cursorActive: false
   property bool adding: false
   property string addError: ""
+  property string editingId: ""
   property bool draggingSite: false
   property int dragSourceIndex: -1
   property int dragInsertBefore: -1
@@ -154,19 +155,39 @@ Panel {
   function startAdding() {
     adding = true
     addError = ""
+    editingId = ""
+    nameField.text = ""
+    urlField.text = ""
     setAddCursor()
     Qt.callLater(function() {
       nameField.forceActiveFocus()
       nameField.selectAll()
+      if (addFormSurface) scrollItemIntoView(addFormSurface)
     })
   }
 
   function stopAdding() {
     adding = false
     addError = ""
+    editingId = ""
     nameField.text = ""
     urlField.text = ""
     Qt.callLater(function() { if (keyCatcher) keyCatcher.forceActiveFocus() })
+  }
+
+  function startEditing(site) {
+    if (!site || !site.id) return
+    adding = true
+    addError = ""
+    editingId = String(site.id)
+    nameField.text = String(site.name || "")
+    urlField.text = String(site.url || "")
+    setAddCursor()
+    Qt.callLater(function() {
+      nameField.forceActiveFocus()
+      nameField.selectAll()
+      if (addFormSurface) scrollItemIntoView(addFormSurface)
+    })
   }
 
   function submitAdd() {
@@ -174,12 +195,21 @@ Panel {
       addError = "Service not ready"
       return
     }
-    var error = omaup.addTarget(nameField.text, urlField.text)
+    var error = editingId !== "" && typeof omaup.updateTarget === "function"
+      ? omaup.updateTarget(editingId, nameField.text, urlField.text)
+      : omaup.addTarget(nameField.text, urlField.text)
     if (error !== "") {
       addError = error
       return
     }
+    var savedId = editingId
     stopAdding()
+    if (savedId !== "") {
+      focusedSiteId = savedId
+      focusSection = "sites"
+      syncCursorToFocusedSite()
+      return
+    }
     if (sites.length > 0) {
       focusSection = "sites"
       siteIndex = sites.length - 1
@@ -245,6 +275,7 @@ Panel {
   }
 
   function beginSiteDrag(index) {
+    if (adding) stopAdding()
     draggingSite = true
     dragSourceIndex = index
     dragInsertBefore = index
@@ -301,6 +332,7 @@ Panel {
     cursorActive = false
     adding = false
     addError = ""
+    editingId = ""
     nameField.text = ""
     urlField.text = ""
     cancelSiteDrag()
@@ -664,11 +696,15 @@ Panel {
 
       anchors.fill: parent
       hoverEnabled: true
-      acceptedButtons: Qt.LeftButton
+      acceptedButtons: Qt.LeftButton | Qt.RightButton
       preventStealing: dragging
       cursorShape: dragging ? Qt.ClosedHandCursor : Qt.PointingHandCursor
       onEntered: if (!root.draggingSite) root.setSiteCursor(siteRow.rowIndex)
       onPressed: function(mouse) {
+        if (mouse.button === Qt.RightButton) {
+          root.startEditing(siteRow.site)
+          return
+        }
         dragging = false
         suppressClick = false
         pressedX = mouse.x
@@ -700,8 +736,8 @@ Panel {
         suppressClick = false
         root.cancelSiteDrag()
       }
-      onClicked: {
-        if (suppressClick) return
+      onClicked: function(mouse) {
+        if (suppressClick || mouse.button === Qt.RightButton) return
         if (omaup) omaup.openTarget(siteRow.site)
       }
     }

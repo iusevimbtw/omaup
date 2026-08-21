@@ -175,6 +175,30 @@ Item {
     return ""
   }
 
+  function updateTarget(id, name, url) {
+    var index = findIndex(id)
+    if (index < 0) return "Site not found"
+    var parsed = Model.normalizeTarget(name, url)
+    if (!parsed.ok) return parsed.error
+    var duplicate = findByUrl(parsed.url)
+    if (duplicate && duplicate.id !== id) return "Already tracking this URL"
+    var current = items[index]
+    var urlChanged = current.url !== parsed.url
+    var nameChanged = current.name !== parsed.name
+    if (!urlChanged && !nameChanged) return ""
+    var fields = { name: parsed.name, url: parsed.url }
+    if (urlChanged) {
+      fields.status = "unknown"
+      fields.checking = false
+      fields.httpCode = 0
+      fields.error = ""
+    }
+    patchItem(id, fields)
+    persist()
+    if (urlChanged) enqueue([id])
+    return ""
+  }
+
   function removeTarget(id) {
     var next = []
     for (var i = 0; i < items.length; i++) {
