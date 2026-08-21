@@ -22,7 +22,6 @@ Item {
   property bool configReady: false
   property bool writingConfig: false
   property string lastWrittenConfig: ""
-  property string pendingWrite: ""
   property bool offline: false
   property bool connectivityPending: false
   property bool checkAfterProbe: false
@@ -131,15 +130,9 @@ Item {
   function loadConfig(raw) {
     if (writingConfig) return
     var parsed = Model.parseConfig(raw)
-    if (!parsed.ok) {
-      if (!configReady && items.length === 0) {
-        applyTargets([])
-        configReady = true
-      }
+    if (!parsed.apply || (parsed.targets.length === 0 && items.length > 0 && !parsed.emptyList)) {
+      if (!configReady) configReady = true
       return
-    }
-    if (parsed.targets.length === 0 && items.length > 0) {
-      if (!configReady || !parsed.emptyList) return
     }
     applyTargets(parsed.targets)
     configReady = true
@@ -156,7 +149,7 @@ Item {
     var text = Model.serializeConfig(items)
     if (text === lastWrittenConfig) return
     writingConfig = true
-    pendingWrite = text
+    lastWrittenConfig = text
     configFile.setText(text)
   }
 
@@ -454,27 +447,10 @@ Item {
     atomicWrites: true
     blockLoading: true
     printErrors: false
-    onLoaded: {
-      if (root.writingConfig) return
-      root.loadConfig(text())
-    }
-    onLoadFailed: {
-      if (root.writingConfig) return
-      if (root.items.length > 0) {
-        root.configReady = true
-        return
-      }
-      root.loadConfig("")
-    }
-    onSaved: {
-      root.lastWrittenConfig = root.pendingWrite
-      root.pendingWrite = ""
-      root.writingConfig = false
-    }
-    onSaveFailed: {
-      root.pendingWrite = ""
-      root.writingConfig = false
-    }
+    onLoaded: root.loadConfig(text())
+    onLoadFailed: root.loadConfig("")
+    onSaved: root.writingConfig = false
+    onSaveFailed: root.writingConfig = false
     onFileChanged: if (!root.writingConfig) reload()
   }
 
