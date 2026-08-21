@@ -3,7 +3,7 @@
 HTTP uptime watcher for the [Omarchy](https://omarchy.org/) bar. Plugin id is
 `iusevimbtw.omaup`.
 
-The bar icon is Omarchy’s generic browser glyph. It uses the active theme’s
+The bar icon is the web globe glyph. It uses the active theme’s
 green when every watched URL is up, and the theme’s red when something is
 down. Click the icon for a list of sites; add and remove them in that panel.
 

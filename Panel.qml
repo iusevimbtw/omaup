@@ -184,7 +184,7 @@ Panel {
     id: button
     anchors.fill: parent
     bar: root.bar
-    text: ""
+    text: "󰖟"
     foreground: root.barIconColor
     slotSize: Style.bar.statusSlot
     tooltipText: omaup.heroMeta
@@ -245,7 +245,7 @@ Panel {
             fontFamily: root.fontFamily
             iconComponent: Component {
               Text {
-                text: ""
+                text: "󰖟"
                 color: root.heroIconColor
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.display
