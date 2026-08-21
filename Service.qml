@@ -38,6 +38,14 @@ Item {
     return base + "/omaup"
   }
   readonly property string configPath: configDir + "/config.json"
+  readonly property string cacheDir: {
+    var xdg = String(Quickshell.env("XDG_CACHE_HOME") || "")
+    var home = String(Quickshell.env("HOME") || "")
+    var base = xdg !== "" ? xdg : (home + "/.cache")
+    return base + "/omaup"
+  }
+  readonly property string notifyIconDownPath: cacheDir + "/notify-down.svg"
+  readonly property string notifyIconUpPath: cacheDir + "/notify-up.svg"
   readonly property color themeGreen: greenHex !== "" ? greenHex : Color.accent
   readonly property int refreshIntervalSec: intervalFromShell(shell ? shell.shellConfig : null, 30, 5, 3600)
   readonly property int targetCount: { itemsRevision; return Array.isArray(items) ? items.length : 0 }
@@ -424,18 +432,45 @@ Item {
     Qt.callLater(pump)
   }
 
+  function colorHex(c) {
+    function hex(n) {
+      var v = Math.round(Math.max(0, Math.min(1, Number(n))) * 255)
+      var s = v.toString(16)
+      return s.length < 2 ? "0" + s : s
+    }
+    if (!c) return "#888888"
+    return "#" + hex(c.r) + hex(c.g) + hex(c.b)
+  }
+
+  function globeSvg(fill) {
+    var stroke = String(fill || "#888888")
+    return '<?xml version="1.0" encoding="UTF-8"?>\n'
+      + '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24">\n'
+      + '<g fill="none" stroke="' + stroke + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">\n'
+      + '<circle cx="12" cy="12" r="10"/>\n'
+      + '<path d="M2 12h20"/>\n'
+      + '<path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>\n'
+      + '</g>\n'
+      + '</svg>\n'
+  }
+
   function notifyFlip(item, previous, result) {
     if (!item || !result) return
     if (previous !== "up" && previous !== "down") return
     if (result.status !== "up" && result.status !== "down") return
     if (previous === result.status) return
+    var down = result.status === "down"
+    var path = down ? notifyIconDownPath : notifyIconUpPath
+    var file = down ? notifyIconDownFile : notifyIconUpFile
+    file.setText(globeSvg(down ? colorHex(Color.urgent) : colorHex(themeGreen)))
     Quickshell.execDetached([
       "omarchy-notification-send",
-      "-u", result.status === "down" ? "critical" : "low",
+      "-u", down ? "critical" : "low",
       "-g", "",
+      "--image", path,
       "--app-name", "Omaup",
       item.name,
-      result.status === "down" ? (result.error || "Down") : "Back up"
+      down ? (result.error || "Down") : "Back up"
     ])
   }
 
@@ -471,6 +506,24 @@ Item {
     onSaved: root.writingConfig = false
     onSaveFailed: root.writingConfig = false
     onFileChanged: if (!root.writingConfig) reload()
+  }
+
+  FileView {
+    id: notifyIconDownFile
+    path: root.notifyIconDownPath
+    preload: false
+    atomicWrites: true
+    blockWrites: true
+    printErrors: false
+  }
+
+  FileView {
+    id: notifyIconUpFile
+    path: root.notifyIconUpPath
+    preload: false
+    atomicWrites: true
+    blockWrites: true
+    printErrors: false
   }
 
   FileView {
