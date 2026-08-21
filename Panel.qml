@@ -441,6 +441,19 @@ Panel {
     hasCursor: root.sitesHasCursor && root.siteIndex === rowIndex
     foreground: root.foreground
     implicitHeight: siteContent.implicitHeight + Style.spacing.rowPaddingX
+    readonly property real nameNaturalWidth: Math.ceil(nameMetrics.advanceWidth)
+    readonly property real pairNaturalWidth: nameNaturalWidth + Style.space(8) + statusLabel.implicitWidth
+    readonly property real pairBudget: {
+      var inner = siteContent.width
+      if (inner <= 0) return pairNaturalWidth
+      return Math.max(0, inner - statusDot.width - removeBtn.implicitWidth - siteContent.spacing * 3)
+    }
+
+    TextMetrics {
+      id: nameMetrics
+      font: nameLabel.font
+      text: nameLabel.text
+    }
 
     MouseArea {
       anchors.fill: parent
@@ -452,6 +465,7 @@ Panel {
     }
 
     RowLayout {
+      id: siteContent
       anchors.left: parent.left
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
@@ -460,6 +474,7 @@ Panel {
       spacing: Style.space(8)
 
       Rectangle {
+        id: statusDot
         width: Style.space(8)
         height: Style.space(8)
         radius: width / 2
@@ -467,13 +482,18 @@ Panel {
         Layout.alignment: Qt.AlignVCenter
       }
 
-      ColumnLayout {
-        id: siteContent
-        Layout.fillWidth: true
-        spacing: Style.space(1)
+      Item {
+        id: nameStatus
+        Layout.fillWidth: false
+        Layout.alignment: Qt.AlignVCenter
+        Layout.preferredWidth: Math.min(siteRow.pairNaturalWidth, siteRow.pairBudget)
+        Layout.maximumWidth: Math.min(siteRow.pairNaturalWidth, siteRow.pairBudget)
+        Layout.minimumWidth: Math.min(siteRow.pairNaturalWidth, siteRow.pairBudget)
+        implicitHeight: nameLabel.implicitHeight
 
         Text {
-          Layout.fillWidth: true
+          id: nameLabel
+          width: Math.min(siteRow.nameNaturalWidth, Math.max(0, parent.width - statusLabel.implicitWidth - Style.space(8)))
           text: siteRow.site ? String(siteRow.site.name || "Site") : "Site"
           color: root.foreground
           font.family: root.fontFamily
@@ -482,16 +502,25 @@ Panel {
         }
 
         Text {
-          Layout.fillWidth: true
+          id: statusLabel
+          anchors.left: nameLabel.right
+          anchors.leftMargin: Style.space(8)
+          anchors.baseline: nameLabel.baseline
           text: Model.caption(siteRow.site)
           color: root.dim
           font.family: root.fontFamily
           font.pixelSize: Style.font.caption
-          elide: Text.ElideRight
         }
       }
 
+      Item {
+        Layout.fillWidth: true
+        Layout.preferredWidth: 0
+        Layout.minimumWidth: 0
+      }
+
       PanelActionButton {
+        id: removeBtn
         iconText: "󰆴"
         tooltipText: "Remove"
         foreground: root.foreground
