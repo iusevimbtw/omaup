@@ -194,16 +194,25 @@ Item {
     persist()
   }
 
-  function moveTarget(fromIndex, toIndex) {
-    if (!Array.isArray(items)) return
-    var from = parseInt(fromIndex, 10)
-    var to = parseInt(toIndex, 10)
-    if (!isFinite(from) || !isFinite(to)) return
-    if (from === to) return
-    if (from < 0 || from >= items.length || to < 0 || to >= items.length) return
+  function moveTarget(id, beforeId) {
+    var from = findIndex(id)
+    if (from < 0) return
+    var before = String(beforeId || "")
+    var currentNext = from + 1 < items.length && items[from + 1] ? String(items[from + 1].id || "") : ""
+    if (before === currentNext) return
+    if (before === "" && from === items.length - 1) return
     var next = items.slice()
     var item = next.splice(from, 1)[0]
     if (!item) return
+    var to = next.length
+    if (before !== "") {
+      for (var i = 0; i < next.length; i++) {
+        if (next[i] && String(next[i].id || "") === before) {
+          to = i
+          break
+        }
+      }
+    }
     next.splice(to, 0, item)
     setItems(next)
     persist()

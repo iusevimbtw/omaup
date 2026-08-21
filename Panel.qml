@@ -21,13 +21,19 @@ Panel {
   property bool draggingSite: false
   property int dragSourceIndex: -1
   property int dragInsertBefore: -1
+  property string dragSourceId: ""
+  property string focusedSiteId: ""
 
   readonly property color foreground: bar ? bar.foreground : Color.foreground
   readonly property color urgent: bar ? bar.urgent : Color.urgent
   readonly property color dim: Qt.darker(foreground, 1.55)
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
   readonly property var omaup: bar && bar.shell ? bar.shell.serviceFor(moduleName) : null
-  readonly property var sites: omaup && omaup.items ? omaup.items : []
+  readonly property var sites: {
+    if (!omaup) return []
+    omaup.itemsRevision
+    return Model.displaySites(omaup.items)
+  }
   readonly property color barIconColor: {
     if (!omaup) return barForeground
     if (omaup.downCount > 0) return urgent
@@ -44,15 +50,40 @@ Panel {
   readonly property bool addHasCursor: cursorActive && focusSection === "add"
   readonly property bool editingAdd: adding && (nameField.activeFocus || urlField.activeFocus)
 
+  function siteIdAt(index) {
+    if (!Array.isArray(sites) || index < 0 || index >= sites.length || !sites[index]) return ""
+    return String(sites[index].id || "")
+  }
+
+  function indexOfSiteId(id) {
+    var needle = String(id || "")
+    if (needle === "" || !Array.isArray(sites)) return -1
+    for (var i = 0; i < sites.length; i++) {
+      if (sites[i] && String(sites[i].id || "") === needle) return i
+    }
+    return -1
+  }
+
+  function syncCursorToFocusedSite() {
+    if (focusSection !== "sites") return
+    var index = indexOfSiteId(focusedSiteId)
+    if (index >= 0) siteIndex = index
+    else ensureCursor()
+  }
+
   function ensureCursor() {
     if (!Array.isArray(sites) || sites.length === 0) {
       focusSection = "add"
       siteIndex = 0
+      focusedSiteId = ""
       return
     }
     if (focusSection !== "sites" && focusSection !== "add") focusSection = "sites"
+    var focused = indexOfSiteId(focusedSiteId)
+    if (focusSection === "sites" && focused >= 0) siteIndex = focused
     if (siteIndex >= sites.length) siteIndex = sites.length - 1
     if (siteIndex < 0) siteIndex = 0
+    if (focusSection === "sites") focusedSiteId = siteIdAt(siteIndex)
   }
 
   function moveCursor(dx, dy) {
@@ -65,12 +96,14 @@ Panel {
         return
       }
       siteIndex = Math.max(0, Math.min(sites.length - 1, siteIndex + dy))
+      focusedSiteId = siteIdAt(siteIndex)
       scrollCursorIntoView()
       return
     }
     if (dy < 0 && sites.length > 0) {
       focusSection = "sites"
       siteIndex = sites.length - 1
+      focusedSiteId = siteIdAt(siteIndex)
       scrollCursorIntoView()
     }
   }
@@ -99,6 +132,7 @@ Panel {
     cursorActive = true
     focusSection = "sites"
     siteIndex = index
+    focusedSiteId = siteIdAt(index)
     scrollCursorIntoView()
   }
 
@@ -139,6 +173,7 @@ Panel {
     if (sites.length > 0) {
       focusSection = "sites"
       siteIndex = sites.length - 1
+      focusedSiteId = siteIdAt(siteIndex)
       scrollCursorIntoView()
     }
   }
@@ -202,9 +237,11 @@ Panel {
     draggingSite = true
     dragSourceIndex = index
     dragInsertBefore = index
+    dragSourceId = siteIdAt(index)
     cursorActive = true
     focusSection = "sites"
     siteIndex = index
+    focusedSiteId = dragSourceId
   }
 
   function updateSiteDrag(yInColumn) {
@@ -221,17 +258,21 @@ Panel {
   }
 
   function endSiteDrag() {
-    var from = dragSourceIndex
+    var id = dragSourceId
     var insertBefore = dragInsertBefore
+    var displayed = sites
+    var from = indexOfSiteId(id)
     draggingSite = false
     dragSourceIndex = -1
     dragInsertBefore = -1
+    dragSourceId = ""
     if (!omaup || typeof omaup.moveTarget !== "function") return
-    if (from < 0 || insertBefore < 0) return
+    if (id === "" || from < 0 || insertBefore < 0) return
     if (insertBefore === from || insertBefore === from + 1) return
-    var to = insertBefore > from ? insertBefore - 1 : insertBefore
-    omaup.moveTarget(from, to)
-    siteIndex = to
+    var beforeId = insertBefore < displayed.length ? siteIdAt(insertBefore) : ""
+    omaup.moveTarget(id, beforeId)
+    focusedSiteId = id
+    syncCursorToFocusedSite()
     ensureCursor()
   }
 
@@ -239,6 +280,7 @@ Panel {
     draggingSite = false
     dragSourceIndex = -1
     dragInsertBefore = -1
+    dragSourceId = ""
   }
 
   implicitWidth: button.implicitWidth
@@ -260,6 +302,7 @@ Panel {
     cancelSiteDrag()
   }
   onSiteIndexChanged: scrollCursorIntoView()
+  onSitesChanged: if (!draggingSite) syncCursorToFocusedSite()
 
   IpcHandler {
     target: root.ipcTarget
@@ -539,7 +582,7 @@ Panel {
 
     hasCursor: root.sitesHasCursor && root.siteIndex === rowIndex && !root.draggingSite
     foreground: root.foreground
-    opacity: root.draggingSite && root.dragSourceIndex === rowIndex ? 0.45 : 1
+    opacity: root.draggingSite && siteRow.site && String(siteRow.site.id || "") === root.dragSourceId ? 0.45 : 1
     z: sitePointer.dragging ? 10 : 0
     implicitHeight: siteContent.implicitHeight + Style.spacing.rowPaddingX
     readonly property real nameNaturalWidth: Math.ceil(nameMetrics.advanceWidth)

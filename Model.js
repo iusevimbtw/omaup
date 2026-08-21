@@ -132,6 +132,19 @@ function caption(item) {
   return "Waiting…"
 }
 
+function displaySites(items) {
+  var down = []
+  var rest = []
+  if (!Array.isArray(items)) return rest
+  for (var i = 0; i < items.length; i++) {
+    var item = items[i]
+    if (!item) continue
+    if (item.status === "down") down.push(item)
+    else rest.push(item)
+  }
+  return down.concat(rest)
+}
+
 function countBy(items, key, value) {
   var n = 0
   if (!Array.isArray(items)) return 0
