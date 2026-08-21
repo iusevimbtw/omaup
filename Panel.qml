@@ -704,7 +704,14 @@ Panel {
 
     hasCursor: root.sitesHasCursor && root.siteIndex === rowIndex && !root.draggingSite
     foreground: root.foreground
-    opacity: root.draggingSite && siteRow.site && String(siteRow.site.id || "") === root.dragSourceId ? 0.45 : 1
+    opacity: {
+      if (!siteRow.site) return 1
+      var id = String(siteRow.site.id || "")
+      if (id === "") return 1
+      if (root.draggingSite && id === root.dragSourceId) return 0.45
+      if (id === root.editingId) return 0.45
+      return 1
+    }
     z: sitePointer.dragging ? 10 : 0
     implicitHeight: siteContent.implicitHeight + Style.spacing.rowPaddingX
     readonly property real nameNaturalWidth: Math.ceil(nameMetrics.advanceWidth)
