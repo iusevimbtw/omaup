@@ -32,9 +32,13 @@ The widget lands in the right section of the bar. Move it with
 
 ## Use
 
-- Left click: open the status list
-- Right click: refresh now
-- In the panel: click **Add** to enter a name and URL; click a row to open it; trash to remove
+- Left click the bar icon: open the status list
+- Right click the bar icon: refresh now
+- In the panel: **Add** opens a form (Cancel / Add, or Save when editing). Esc cancels; Enter on the URL field saves
+- Left click a row: open the URL; right click: edit; drag: reorder within **ONLINE** or **OFFLINE**
+- Down sites pin under **OFFLINE** until they recover
+- **No internet** when this machine is offline; last-known site status is kept
+- A notification fires when a site goes down or comes back up (not on the first check)
 - Keys: `j`/`k` move, Enter opens, `a` focuses add, `x` removes, `r` refreshes, Esc closes
 
 A site is **up** when the final HTTP status after redirects is 2xx. Timeouts,

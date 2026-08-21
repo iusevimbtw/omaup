@@ -404,11 +404,14 @@ Item {
     var id = activeId
     var generation = activeGeneration
     activeId = ""
-    if (id === "" || generation !== checkGeneration || findIndex(id) < 0 || offline) {
+    var index = findIndex(id)
+    if (id === "" || generation !== checkGeneration || index < 0 || offline) {
       Qt.callLater(pump)
       return
     }
+    var previous = items[index] ? String(items[index].status || "") : ""
     var result = Model.classifyHttp(codeText, exitCode)
+    var localFail = Model.isLocalConnectivityFailure(codeText, exitCode)
     patchItem(id, {
       checking: false,
       status: result.status,
@@ -416,8 +419,24 @@ Item {
       error: result.error
     })
     passChecks++
-    if (Model.isLocalConnectivityFailure(codeText, exitCode)) passLocalFails++
+    if (localFail) passLocalFails++
+    else notifyFlip(items[index], previous, result)
     Qt.callLater(pump)
+  }
+
+  function notifyFlip(item, previous, result) {
+    if (!item || !result) return
+    if (previous !== "up" && previous !== "down") return
+    if (result.status !== "up" && result.status !== "down") return
+    if (previous === result.status) return
+    Quickshell.execDetached([
+      "omarchy-notification-send",
+      "-u", result.status === "down" ? "critical" : "low",
+      "-g", "",
+      "--app-name", "Omaup",
+      item.name,
+      result.status === "down" ? (result.error || "Down") : "Back up"
+    ])
   }
 
   function openTarget(item) {
