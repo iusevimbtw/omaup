@@ -19,8 +19,10 @@ Item {
   property int checkGeneration: 0
   property int activeGeneration: 0
   property bool hydrating: false
-  property bool persistAfterMkdir: false
+  property bool configReady: false
   property bool writingConfig: false
+  property string lastWrittenConfig: ""
+  property string pendingWrite: ""
   property bool offline: false
   property bool connectivityPending: false
   property bool checkAfterProbe: false
@@ -126,30 +128,36 @@ Item {
     if (newIds.length > 0) enqueue(newIds)
   }
 
-  function ignoreConfigRead() {
-    return writingConfig || persistAfterMkdir
-  }
-
   function loadConfig(raw) {
-    if (ignoreConfigRead()) return
-    var text = String(raw || "")
-    var parsed = Model.parseConfig(text)
-    if (parsed.targets.length === 0 && items.length > 0 && text.trim() === "") return
+    if (writingConfig) return
+    var parsed = Model.parseConfig(raw)
+    if (!parsed.ok) {
+      if (!configReady && items.length === 0) {
+        applyTargets([])
+        configReady = true
+      }
+      return
+    }
+    if (parsed.targets.length === 0 && items.length > 0) {
+      if (!configReady || !parsed.emptyList) return
+    }
     applyTargets(parsed.targets)
+    configReady = true
+    lastWrittenConfig = Model.serializeConfig(items)
   }
 
   function persist() {
-    if (hydrating) return
-    writingConfig = true
-    persistAfterMkdir = true
-    ensureDirProc.command = ["mkdir", "-p", root.configDir]
-    if (!ensureDirProc.running) ensureDirProc.running = true
+    if (hydrating || !configReady) return
+    persistTimer.restart()
   }
 
-  function writeConfig() {
-    persistAfterMkdir = false
+  function flushConfig() {
+    if (hydrating || !configReady) return
+    var text = Model.serializeConfig(items)
+    if (text === lastWrittenConfig) return
     writingConfig = true
-    configFile.setText(Model.serializeConfig(items))
+    pendingWrite = text
+    configFile.setText(text)
   }
 
   function addTarget(name, url) {
@@ -429,17 +437,14 @@ Item {
   }
 
   Component.onCompleted: {
-    ensureDirProc.command = ["mkdir", "-p", root.configDir]
-    ensureDirProc.running = true
     colorsFile.reload()
   }
 
-  Process {
-    id: ensureDirProc
-    onExited: {
-      if (root.persistAfterMkdir) root.writeConfig()
-      else configFile.reload()
-    }
+  Timer {
+    id: persistTimer
+    interval: 200
+    repeat: false
+    onTriggered: root.flushConfig()
   }
 
   FileView {
@@ -447,21 +452,30 @@ Item {
     path: root.configPath
     watchChanges: true
     atomicWrites: true
+    blockLoading: true
     printErrors: false
     onLoaded: {
-      if (root.persistAfterMkdir) return
-      if (root.writingConfig) {
-        root.writingConfig = false
-        return
-      }
+      if (root.writingConfig) return
       root.loadConfig(text())
     }
     onLoadFailed: {
-      if (root.ignoreConfigRead()) return
-      if (root.items.length > 0) return
+      if (root.writingConfig) return
+      if (root.items.length > 0) {
+        root.configReady = true
+        return
+      }
       root.loadConfig("")
     }
-    onFileChanged: if (!root.ignoreConfigRead()) reload()
+    onSaved: {
+      root.lastWrittenConfig = root.pendingWrite
+      root.pendingWrite = ""
+      root.writingConfig = false
+    }
+    onSaveFailed: {
+      root.pendingWrite = ""
+      root.writingConfig = false
+    }
+    onFileChanged: if (!root.writingConfig) reload()
   }
 
   FileView {

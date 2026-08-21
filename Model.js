@@ -1,12 +1,16 @@
 function parseConfig(raw) {
   var text = String(raw || "").trim()
-  if (text === "") return { targets: [] }
+  if (text === "") return { ok: true, targets: [], emptyList: false }
   try {
     var parsed = JSON.parse(text)
-    if (!parsed || typeof parsed !== "object") return { targets: [] }
-    return { targets: parseTargets(parsed.targets) }
+    if (!parsed || typeof parsed !== "object") return { ok: false, targets: [] }
+    if (!Object.prototype.hasOwnProperty.call(parsed, "targets")) {
+      return { ok: true, targets: [], emptyList: false }
+    }
+    if (!Array.isArray(parsed.targets)) return { ok: false, targets: [] }
+    return { ok: true, targets: parseTargets(parsed.targets), emptyList: parsed.targets.length === 0 }
   } catch (e) {
-    return { targets: [] }
+    return { ok: false, targets: [] }
   }
 }
 
